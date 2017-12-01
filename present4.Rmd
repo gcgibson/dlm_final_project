@@ -90,6 +90,18 @@ lines(filt$f,col="red")
 
 
 #Mechanistic Integration
+$$\beta \sim Exp(\lambda_1)$$
+$$\gamma \sim Exp(\lambda_2)
+$$(S_t,I_t,R_t) \sim Dirichlet(f(S_{t-1},I_{t-1},R_{t-1},\beta,\gamma))$$
+
+
+
+$$f = \text{rkf approx to ode}$$
+
+
+
+$$Y_t \sim Pois(NI_t)$$
+
 ```{r, message=FALSE,warning=FALSE,echo=FALSE}
 require(rbiips)
 library(MCMCpack)
