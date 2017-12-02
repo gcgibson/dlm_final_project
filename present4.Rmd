@@ -121,14 +121,14 @@ dMN_dim <- function(s,i,r) {
 dMN_sample <- function(s,i,r) {
   # Draw a sample of distribution dMN
 
-  rsamp <- rmultinomial(20000,c(s/(s+i+r),i/(s+i+r),r/(s+i+r)))
+  rsamp <- rmultinom(20000,c(s/(s+i+r),i/(s+i+r),r/(s+i+r)))
   c(rsamp[1],rsamp[2],rsamp[3])
 }
 biips_add_distribution('ddirch', 3, dMN_dim, dMN_sample)
 
 
 
-model_file = '/Users/gcgibson/DLM_Final_Project/blob.bug' # BUGS model filename
+model_file = '/home/gcgibson/dlm_final_project/blob.bug' # BUGS model filename
 cat(readLines(model_file), sep = "\n")
 
 par(bty='l')
@@ -171,9 +171,9 @@ if (FALSE){
 
 
 ### PARTICLE FILTER
-n_part = 10000 # Number of particles
+n_part = 100000 # Number of particles
 variables = c('x','y') # Variables to be monitored
-mn_type = 'fs'; rs_type = 'multinomial'; rs_thres = 0.9 # Optional parameters
+mn_type = 'fs'; rs_type = 'stratified'; rs_thres = 0.9 # Optional parameters
 
 
 
