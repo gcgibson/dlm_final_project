@@ -3,18 +3,18 @@ library(ggplot2)
 SJdat<-read.csv("http://dengueforecasting.noaa.gov/Training/San_Juan_Training_Data.csv")
 dat <- SJdat[c("season_week","total_cases")]
 
-cases <- dat$total_cases[1:200]
+cases <- dat$total_cases[1:100]
 require(rbiips)
 library(MCMCpack)
 dMN_dim <- function(s,i) {
   # Check dimensions of the input and return dimension of the output of
   # distribution dMN
-  3
+  2
 }
 dMN_sample <- function(s,i) {
   # Draw a sample of distribution dMN
   
-  rsamp <- rtmvnorm(1, mean=c(s,i),sigma=matrix(c(1,0,0,1),nrow=2,byrow = FALSE))
+  rsamp <- rtmvnorm(1, mean=c(s,i),sigma=matrix(c(1,.9,.9,1),nrow=2,byrow = FALSE),lower=c(0,0))
                   
   c(rsamp[1],rsamp[2])
 }
@@ -22,7 +22,7 @@ biips_add_distribution('ddirch', 2, dMN_dim, dMN_sample)
 
 
 
-model_file = '/home/gcgibson/dlm_final_project/blob.bug' # BUGS model filename
+model_file = '/Users/gcgibson/DLM_Final_Project/blob.bug' # BUGS model filename
 cat(readLines(model_file), sep = "\n")
 
 par(bty='l')
