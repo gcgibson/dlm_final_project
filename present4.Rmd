@@ -7,15 +7,125 @@ output: pdf_document
 
 #Introduction to Dengue
 
+Introduction:
+    Incidence of Dengue follows seasonal transmission patterns, and tend to have outbreaks every fews years. Since these epidemics are currently hard to predict and they affect to the population in areas where dengue is endemic. Early recognition and prompt treatment of severe cases can substantially lower the risk of medical complications and death. Accurate forecasts of cases of infected individuals, or incidence, are key to planning and resource allocation. For example, knowing well in advance the numbers of cases that are expected and when they will occur allows preparation via education and community mobilization campaigns, reallocation of resources (people, insecticide, diagnostic reagents) to high-risk areas, or re-training of physicians to recognize symptoms and to treat appropriately (Kuhn et al., 2005; Degallier et al., 2010; Thomson et al., 2008) in advance of peak transmission. Our goal is to develop an optimal dlm model to predict the epidemics of dengue using only data from time periods prior to the historical dengue seasons. 
 
+Data:
+    The provided data include weekly dengue incidence and linked environmental variables, and the training and testing sets may be downloaded from http://dengueforecasting.noaa.gov/ The dengue incidence portion is comprised of historical surveillance data at Iquitos, Peru and San Juan, Puerto Rico, summarized weekly. Cases in the data set include laboratory-confirmed and serotype-specific cases. The data are reflecting the total number of cases in each week, possibly revised or estimated ex post. A breakdown of incidence into strata of four serotypes, with a fifth un-serotyped category, were also provided. However, we only trained on total_cases in the data file.
 #Basic attempts at modelling 
+
 ##Locally-level
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
+library(dlm)
+library(ggplot2)
+SJdat<-read.csv("http://dengueforecasting.noaa.gov/Training/San_Juan_Training_Data.csv")
+dat <- SJdat[c("season_week","total_cases")]
+plot.ts(dat$total_cases, ylab="Incidence")
+
+#LOCAL LEVEL BUILD
+locally_level_build <- function(x){
+  dlmModPoly(order=1,dV=exp(x[1]),dW=exp(x[2]))
+}
+
+#COMPUTE MLE ESTIMATE
+locally_level_mle <- dlmMLE(dat$total_cases, parm=c(0,0), build=locally_level_build)
+
+#GET FILTERED RESULTS
+locally_level_filtered <- dlmFilter(dat$total_cases, locally_level_build(locally_level_mle$par))
+```
+
 ##Locally-level+Seasonal
-##Locally-linear+ Seasonal
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
+library(dlm)
+library(ggplot2)
+SJdat<-read.csv("http://dengueforecasting.noaa.gov/Training/San_Juan_Training_Data.csv")
+dat <- SJdat[c("season_week","total_cases")]
+plot.ts(dat$total_cases, ylab="Incidence")
+
+#LOCAL LEVEL BUILD
+locally_level_seasonal_build <- function(x){
+  dlmModPoly(order=1,dV=exp(x[1]),dW=exp(x[2])) +
+    dlmModSeas(frequency = 4, dV = 0, dW = c(exp(x[3]),rep(0,2)))
+}
+
+#COMPUTE MLE ESTIMATE
+locally_level_seasonal_mle <- dlmMLE(dat$total_cases, parm=c(0,0,0), build=locally_level_seasonal_build)
+
+#GET FILTERED RESULTS
+locally_level_seasonal_filtered <- dlmFilter(dat$total_cases, locally_level_seasonal_build(locally_level_seasonal_mle$par))
+```
+
+##Locally-linear + Seasonal
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
+library(dlm)
+library(ggplot2)
+SJdat<-read.csv("http://dengueforecasting.noaa.gov/Training/San_Juan_Training_Data.csv")
+dat <- SJdat[c("season_week","total_cases")]
+plot.ts(dat$total_cases, ylab="Incidence")
+
+#LOCAL LEVEL BUILD
+locally_linear_seasonal_build <- function(x){
+  dlmModPoly(order=2,dV=exp(x[1]),dW=exp(x[2])) +
+    dlmModSeas(frequency = 52, dV = 0, dW = c(exp(x[3]),rep(0,50)))
+}
+
+#COMPUTE MLE ESTIMATE
+locally_linear_seasonal_mle <- dlmMLE(dat$total_cases, parm=c(0,0,0), build=locally_level_seasonal_build)
+
+#GET FILTERED RESULTS
+locally_linear_seasonal_filtered <- dlmFilter(dat$total_cases, locally_level_seasonal_build(locally_linear_seasonal_mle$par))
+```
+
 ##Seasonal vs Fourier Transform
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
+library(dlm)
+library(ggplot2)
+SJdat<-read.csv("http://dengueforecasting.noaa.gov/Training/San_Juan_Training_Data.csv")
+dat <- SJdat[c("season_week","total_cases")]
+plot.ts(dat$total_cases, ylab="Incidence")
+
+locally_level_fourier_build <- function ( x ) {
+  dlmModPoly ( order=1, dV=exp(x[1]), dW=0 ) +
+    dlmModTrig ( tau=52, q=1, dV=0, dW=rep(exp(x[2]),2) )
+}
+
+#COMPUTE MLE ESTIMATE
+locally_level_fourier_mle <- dlmMLE(dat$total_cases, parm=c(0,0), build=locally_level_fourier_build)
+
+#GET FILTERED RESULTS
+locally_level_fourier_filtered <- dlmFilter(dat$total_cases, locally_level_fourier_build(locally_level_fourier_mle$par))
+
+```
+
 ##Multiple seasonality 
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
+
+library(dlm)
+library(ggplot2)
+SJdat<-read.csv("http://dengueforecasting.noaa.gov/Training/San_Juan_Training_Data.csv")
+dat <- SJdat[c("season_week","total_cases")]
+plot.ts(dat$total_cases, ylab="Incidence")
+
+#LOCAL LEVEL BUILD
+locally_linear_seasonal_build <- function(x){
+  dlmModPoly(order=2,dV=exp(x[1]),dW=exp(x[2])) +
+    dlmModSeas(frequency = 8, dV = 0, dW = c(exp(x[3]),rep(0,6))) +
+       dlmModSeas(frequency = 4, dV = 0, dW = c(exp(x[4]),rep(0,2))) 
+
+}
+
+#COMPUTE MLE ESTIMATE
+locally_linear_seasonal_mle <- dlmMLE(dat$total_cases, parm=c(0,0,0,0), build=locally_level_seasonal_build)
+
+#GET FILTERED RESULTS
+locally_linear_seasonal_filtered <- dlmFilter(dat$total_cases, locally_level_seasonal_build(locally_linear_seasonal_mle$par))
+```
+
+
+
 
 #Alpha model
+
 ##Standard
 
 ```{r, message=FALSE, warning=FALSE, echo=FALSE}
@@ -23,7 +133,6 @@ library(dlm)
 library(ggplot2)
 SJdat<-read.csv("http://dengueforecasting.noaa.gov/Training/San_Juan_Training_Data.csv")
 dat <- SJdat[c("season_week","total_cases")]
-
 plot.ts(dat$total_cases, ylab="Incidence")
 ```
 \bigskip
@@ -89,9 +198,12 @@ lines(filt$f,col="red")
 ##log-alpha model 
 
 
-#Mechanistic Integration
+##Markov chain switching model
+
+
+##Mechanistic Integration
 $$\beta \sim Exp(\lambda_1)$$
-$$\gamma \sim Exp(\lambda_2)
+$$\gamma \sim Exp(\lambda_2)$$
 $$(S_t,I_t,R_t) \sim Dirichlet(f(S_{t-1},I_{t-1},R_{t-1},\beta,\gamma))$$
 
 
@@ -127,8 +239,8 @@ dMN_sample <- function(s,i,r) {
 biips_add_distribution('ddirch', 3, dMN_dim, dMN_sample)
 
 
-
-model_file = '/home/gcgibson/dlm_final_project/blob.bug' # BUGS model filename
+if (FALSE){
+model_file = '/Users/gcgibson/dlm_final_project/blob.bug' # BUGS model filename
 cat(readLines(model_file), sep = "\n")
 
 par(bty='l')
@@ -150,7 +262,7 @@ model = biips_model(model_file, data, sample_data=sample_data) # Create Biips mo
 data = model$data()
 
 ### PMMH
-if (FALSE){
+
   n_burn = 2000 # nb of burn-in/adaptation iterations
   n_iter = 2000 # nb of iterations after burn-in
   thin = 1 # thinning of MCMC outputs
@@ -166,7 +278,7 @@ if (FALSE){
   out_pmmh = biips_pmmh_samples(obj_pmmh, n_iter, n_part, thin=thin) # samples
   
   summ_pmmh = biips_summary(out_pmmh, probs=c(.025, .975))
-}
+
 
 
 
@@ -202,7 +314,7 @@ for (i in seq(1,52)){
 
 forecasts <- 2000*forecasts
 plot(forecasts)
-
+}
 
 
 ```

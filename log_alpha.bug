@@ -1,0 +1,14 @@
+var x[t_max], y[t_max]
+
+model
+{
+  alpha ~ dexp(10)
+  x[1] ~ dnorm(mean_x_init[1],5)
+  y[1] ~ dnorm(x[1]+alpha,5)
+  
+  for (t in 2:t_max)
+  {
+    x[t] ~ dnorm(x[t-1],5 )
+    y[t] ~ dnorm( x[t] + alpha,5)
+  }
+}
