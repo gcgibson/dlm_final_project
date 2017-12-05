@@ -4,7 +4,11 @@ author: ""
 date: "November 30, 2017"
 output: pdf_document
 ---
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
+#DEFIINE GLOBAL VARS
+n_part = 10
 
+```
 #Introduction to Dengue
 
 Introduction:
@@ -219,9 +223,54 @@ abline(v=231,col="grey");abline(v=243,col="grey");
 plot.ts(dat$total_cases,ylab="incidence")
 lines(filt$f,col="red")
 ```
+##log-alpha model dlm
+If we take a log transformation, 
+$$\log y=\log F\theta_t+\log\alpha$$
+that is $$y^{'}=F^{'}\theta_t^{'}+\alpha^{'}$$
+Let $$\theta_t^*=(\theta_t^{'},\alpha^{'})$$, and $$F^*=(F^{'},f^{\alpha})$$, 
+where $f^\alpha=\begin{cases}
+    1, & \text{in summer}\\
+    0, & \text{not in summer}
+\end{cases}$
+ $w^\alpha=\begin{cases}
+    w, & \text{week 1}\\
+    0, & \text{otherwise}
+\end{cases}$
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
+dat.log <- cbind(dat[,1],log(dat[,2]+0.1))
+X <- matrix(0,ncol=2,nrow=988)
+X[,1] <- rep(c(rep(0,22),rep(1,13),rep(0,17)),19)
+FF <- matrix(c(1,1,1,0,0),1,5)
+JFF <- matrix(c(0,0,0,0,1),1,5)
+GG <- matrix(rep(0,25),nrow=5,ncol=5)
+GG[1,1] = 1; GG[1,2] = 1; GG[2,2] = 1;  GG[5,5]=1
+GG[3,3] = cos(2*pi/52); GG[3,4] = sin(2*pi/52)
+GG[4,3] = -sin(2*pi/52); GG[4,4] = cos(2*pi/52)
+mod1 <- function(x){dlm(m0=rep(0,5), C0=1e+07*diag(5), 
+                        X <- matrix(0,ncol=2,nrow=988),
+                        X[,1] <- rep(c(rep(0,22),rep(1,13),rep(0,17)),19),
+                        X[,2] <- rep(c(exp(x[6]),rep(0,51)),19),
+                        FF=FF, 
+                        GG=GG, JFF=JFF, X=X,
+                        V=exp(x[1]), 
+                        W=diag(c(exp(x[2]),exp(x[3]),exp(x[4]),exp(x[5]),0)),
+                        JW=diag(c(0,0,0,0,2)))}
+mle <- dlmMLE(dat.log[,2], parm = rep(1, 6), build=mod1)
+filt = dlmFilter(y=dat.log[,2],mod=mod1(mle$par))
+plot.ts(dat$total_cases, ylab="Incidence")
+lines(exp(dropFirst(filt$m[,1]+filt$m[,2]+filt$m[,3]+filt$m[,5])),col="red") 
+legend("topright", legend=c("filtered","data"), col=c("red","black"), lty=1)
+# forecast
+plot.ts(dat$total_cases)
+lines(exp(filt$f),col="blue")
+plot.ts(residuals(filt)$res)
+qqnorm(residuals(filt)$res)
+qqline(residuals(filt)$res)
+```
 
-##log-alpha model 
+##log-alpha model Particle filtering 
 ```{r}
+if (FALSE){
 SJdat<-read.csv("http://dengueforecasting.noaa.gov/Training/San_Juan_Training_Data.csv")
 dat <- SJdat[c("season_week","total_cases")]
 
@@ -240,7 +289,7 @@ t_max = length(cases)
 n_burn = 500 # nb of burn-in/adaptation iterations
 n_iter = 1000 # nb of iterations after burn-in
 thin = 5 # thinning of MCMC outputs
-n_part = 50 # nb of particles for the SMC
+
 param_names = c('alpha') # names of the variables updated with MCMC (others are updated with SMC)
 latent_names = c('x') # names of the variables updated with SMC and that need to be monitored
 
@@ -254,7 +303,6 @@ model = biips_model(model_file, data=data,sample_data = FALSE)
 n_burn = 5000 # nb of burn-in/adaptation iterations
 n_iter = 10000 # nb of iterations after burn-in
 thin = 5 # thinning of MCMC outputs
-n_part = 50 # nb of particles for the SMC
 param_names = c('alpha') # names of the variables updated with MCMC (others are updated with SMC)
 latent_names = c('x') # names of the variables updated with SMC and that need to be monitored
 inits = list(10)
@@ -265,11 +313,14 @@ biips_pmmh_update(obj_pmmh, n_burn, n_part) # adaptation and burn-in iterations
 out_pmmh = biips_pmmh_samples(obj_pmmh, n_iter, n_part, thin=thin) # samples
 
 summ_pmmh = biips_summary(out_pmmh, probs=c(.025, .975))
-
+}
 ```
 
 ##Markov chain switching model
+In order to incorporate various epidemic onset times we consider a model that permits time-varying. 
+
 ```{r}
+if (FALSE){
 model_file = '/Users/gcgibson/DLM_Final_Project/switching.bug' # BUGS model filename
 cat(readLines(model_file), sep = "\n")
 
@@ -293,10 +344,10 @@ data = list(t_max=t_max, sigma=sigma,y=cases,
 
 model = biips_model(model_file, data, sample_data=FALSE)
 
-n_burn = 2000
-n_iter = 10000
+n_burn = 20
+n_iter = 100
 thin = 1
-n_part = 50
+
 
 
 obj_pimh = biips_pimh_init(model, variables)
@@ -306,6 +357,7 @@ biips_pimh_update(obj_pimh, n_burn, n_part) # Burn-in iterations
 
 out_pimh = biips_pimh_samples(obj_pimh, n_iter, n_part, thin=thin) # Return samples
 summ_pimh = biips_summary(out_pimh, probs=c(.025, .975))
+}
 ```
 
 
@@ -331,7 +383,14 @@ $$Y_t \sim Pois(NI_t)$$
 
 
 ```{r, message=FALSE,warning=FALSE,echo=FALSE}
+if (FALSE){
 cases <- dat$total_cases[1:200]
+library(tmvtnorm)
+library(ggplot2)
+SJdat<-read.csv("http://dengueforecasting.noaa.gov/Training/San_Juan_Training_Data.csv")
+dat <- SJdat[c("season_week","total_cases")]
+
+cases <- dat$total_cases[1:100]
 require(rbiips)
 library(MCMCpack)
 dMN_dim <- function(s,i,r) {
@@ -341,15 +400,16 @@ dMN_dim <- function(s,i,r) {
 }
 dMN_sample <- function(s,i,r) {
   # Draw a sample of distribution dMN
-
-  rsamp <- rmultinom(20000,c(s/(s+i+r),i/(s+i+r),r/(s+i+r)))
+  
+  rsamp <- rdirichlet(1, alpha=c(1e3*s,1e3*i,1e3*r))
+                  
   c(rsamp[1],rsamp[2],rsamp[3])
 }
 biips_add_distribution('ddirch', 3, dMN_dim, dMN_sample)
 
 
-if (FALSE){
-model_file = '/Users/gcgibson/dlm_final_project/blob.bug' # BUGS model filename
+
+model_file = '/Users/gcgibson/DLM_Final_Project/blob.bug' # BUGS model filename
 cat(readLines(model_file), sep = "\n")
 
 par(bty='l')
@@ -363,7 +423,7 @@ prec_x = 1/10
 log_prec_y_true = log(1) # True value used to sample the data
 data = list(t_max=t_max, y = cases +1,prec_x_init=prec_x_init,
             prec_x=prec_x, 
-            mean_x_init=c(.9,.05,.05))
+            mean_x_init=c(1000,10,10))
 
 sample_data = FALSE # Boolean
 model = biips_model(model_file, data, sample_data=sample_data) # Create Biips model and sample data
@@ -371,11 +431,10 @@ model = biips_model(model_file, data, sample_data=sample_data) # Create Biips mo
 data = model$data()
 
 ### PMMH
-
+if (FALSE){
   n_burn = 2000 # nb of burn-in/adaptation iterations
   n_iter = 2000 # nb of iterations after burn-in
   thin = 1 # thinning of MCMC outputs
-  n_part = 50 # nb of particles for the SMC
   param_names = c('beta','gamma') # name of the variables updated with MCMC (others are updated with SMC)
   latent_names = c('x') # name of the variables updated with SMC and that need to be monitored
   
@@ -387,14 +446,14 @@ data = model$data()
   out_pmmh = biips_pmmh_samples(obj_pmmh, n_iter, n_part, thin=thin) # samples
   
   summ_pmmh = biips_summary(out_pmmh, probs=c(.025, .975))
-
+}
 
 
 
 ### PARTICLE FILTER
-n_part = 100000 # Number of particles
+ # Number of particles
 variables = c('x','y') # Variables to be monitored
-mn_type = 'fs'; rs_type = 'stratified'; rs_thres = 0.9 # Optional parameters
+mn_type = 'fs'; rs_type = 'stratified'; rs_thres = 1 # Optional parameters
 
 
 
@@ -407,23 +466,8 @@ summ_smc = biips_summary(out_smc, probs=c(.025, .975))
 x_f_mean = summ_smc$x$f$mean
 x_f_quant = summ_smc$x$f$quant
 
-
-filtered_states = 2000*x_f_mean[2,]
-last_state = tail(t(x_f_mean),n=1)
-
-
-forecasts <- c()
-for (i in seq(1,52)){
-  last_state[1] = last_state[1] +1/6*(-2*last_state[1]*last_state[2])
-  last_state[2] =last_state[2]+ 1/6*(2*last_state[1]*last_state[2]-1.4*last_state[2])
-  last_state[3] = last_state[3] + 1/6*(1.4*last_state[2])
-  last_state <- rdirichlet(1,1e4*last_state)
-  forecasts <- c(forecasts,last_state[2])
+plot(20000*x_f_mean[2,],col='red')
+points(cases,col=1)
 }
-
-forecasts <- 2000*forecasts
-plot(forecasts)
-}
-
 
 ```
