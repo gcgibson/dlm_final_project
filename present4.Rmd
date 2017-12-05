@@ -32,6 +32,11 @@ locally_level_mle <- dlmMLE(dat$total_cases, parm=c(0,0), build=locally_level_bu
 
 #GET FILTERED RESULTS
 locally_level_filtered <- dlmFilter(dat$total_cases, locally_level_build(locally_level_mle$par))
+
+#PLOT FILTERED RESULTS AND DIAGNOSTICS
+plot(locally_level_filtered$f)
+qqnorm(residuals(locally_level_filtered, sd=FALSE))
+qqline(residuals(locally_level_filtered,sd=FALSE))
 ```
 
 ##Locally-level+Seasonal
@@ -53,6 +58,11 @@ locally_level_seasonal_mle <- dlmMLE(dat$total_cases, parm=c(0,0,0), build=local
 
 #GET FILTERED RESULTS
 locally_level_seasonal_filtered <- dlmFilter(dat$total_cases, locally_level_seasonal_build(locally_level_seasonal_mle$par))
+
+
+plot(locally_level_seasonal_filtered$f)
+qqnorm(residuals(locally_level_seasonal_filtered, sd=FALSE))
+qqline(residuals(locally_level_seasonal_filtered,sd=FALSE))
 ```
 
 ##Locally-linear + Seasonal
@@ -74,6 +84,12 @@ locally_linear_seasonal_mle <- dlmMLE(dat$total_cases, parm=c(0,0,0), build=loca
 
 #GET FILTERED RESULTS
 locally_linear_seasonal_filtered <- dlmFilter(dat$total_cases, locally_level_seasonal_build(locally_linear_seasonal_mle$par))
+
+
+plot(locally_linear_seasonal_filtered$f)
+qqnorm(residuals(locally_linear_seasonal_filtered, sd=FALSE))
+qqline(residuals(locally_linear_seasonal_filtered,sd=FALSE))
+
 ```
 
 ##Seasonal vs Fourier Transform
@@ -94,6 +110,10 @@ locally_level_fourier_mle <- dlmMLE(dat$total_cases, parm=c(0,0), build=locally_
 
 #GET FILTERED RESULTS
 locally_level_fourier_filtered <- dlmFilter(dat$total_cases, locally_level_fourier_build(locally_level_fourier_mle$par))
+
+plot(locally_level_fourier_filtered$f)
+qqnorm(residuals(locally_level_fourier_filtered, sd=FALSE))
+qqline(residuals(locally_level_fourier_filtered,sd=FALSE))
 
 ```
 
@@ -119,6 +139,11 @@ locally_linear_seasonal_mle <- dlmMLE(dat$total_cases, parm=c(0,0,0,0), build=lo
 
 #GET FILTERED RESULTS
 locally_linear_seasonal_filtered <- dlmFilter(dat$total_cases, locally_level_seasonal_build(locally_linear_seasonal_mle$par))
+
+
+plot(locally_linear_seasonal_filtered$f)
+qqnorm(residuals(locally_linear_seasonal_filtered, sd=FALSE))
+qqline(residuals(locally_linear_seasonal_filtered,sd=FALSE))
 ```
 
 
@@ -196,9 +221,93 @@ lines(filt$f,col="red")
 ```
 
 ##log-alpha model 
+```{r}
+SJdat<-read.csv("http://dengueforecasting.noaa.gov/Training/San_Juan_Training_Data.csv")
+dat <- SJdat[c("season_week","total_cases")]
 
+cases <- dat$total_cases[1:100]
+require(rbiips)
+library(MCMCpack)
+model_file = '/Users/gcgibson/DLM_final_project/log_alpha.bug' # BUGS model filename
+cat(readLines(model_file), sep = "\n")
+
+par(bty='l')
+light_blue = rgb(.7, .7, 1)
+light_red = rgb(1, .7, .7)
+
+
+t_max = length(cases)
+n_burn = 500 # nb of burn-in/adaptation iterations
+n_iter = 1000 # nb of iterations after burn-in
+thin = 5 # thinning of MCMC outputs
+n_part = 50 # nb of particles for the SMC
+param_names = c('alpha') # names of the variables updated with MCMC (others are updated with SMC)
+latent_names = c('x') # names of the variables updated with SMC and that need to be monitored
+
+G = matrix(c(cos(2*pi),sin(2*pi),-sin(2*pi),cos(2*pi)), nrow=2, byrow=TRUE)
+
+#setting the mean value of the initial count to 1400
+data = list(t_max=t_max, y = cases,  G = G, mean_sigma_init = c(0,0), cov_sigma_init=diag(2) ,mean_x_init=c(0,0))
+model = biips_model(model_file, data=data,sample_data = FALSE)
+
+##fixing variance for now, will extend model to handle inference over variance later
+n_burn = 5000 # nb of burn-in/adaptation iterations
+n_iter = 10000 # nb of iterations after burn-in
+thin = 5 # thinning of MCMC outputs
+n_part = 50 # nb of particles for the SMC
+param_names = c('alpha') # names of the variables updated with MCMC (others are updated with SMC)
+latent_names = c('x') # names of the variables updated with SMC and that need to be monitored
+inits = list(10)
+
+obj_pmmh = biips_pmmh_init(model, param_names, inits=list(1),
+                           latent_names=latent_names) # creates a pmmh object
+biips_pmmh_update(obj_pmmh, n_burn, n_part) # adaptation and burn-in iterations
+out_pmmh = biips_pmmh_samples(obj_pmmh, n_iter, n_part, thin=thin) # samples
+
+summ_pmmh = biips_summary(out_pmmh, probs=c(.025, .975))
+
+```
 
 ##Markov chain switching model
+```{r}
+model_file = '/Users/gcgibson/DLM_Final_Project/switching.bug' # BUGS model filename
+cat(readLines(model_file), sep = "\n")
+
+require(rbiips)
+par(bty='l')
+light_blue = rgb(.7, .7, 1)
+light_red = rgb(1, .7, .7)
+hot_colors = colorRampPalette(c('black', 'red', 'yellow', 'white'))
+
+set.seed(0)
+library(ggplot2)
+SJdat<-read.csv("http://dengueforecasting.noaa.gov/Training/San_Juan_Training_Data.csv")
+dat <- SJdat[c("season_week","total_cases")]
+
+cases <- dat$total_cases[seq(1,10)]
+
+sigma = .4; alpha = c(-2.5, -1); phi = .5; c0 = 1; x0 = 0; t_max = length(cases)
+pi = matrix(c(.9, .1, .1, .9), nrow=2, byrow=TRUE)
+data = list(t_max=t_max, sigma=sigma,y=cases,
+            alpha=alpha, phi=phi, pi=pi, c0=c0, x0=x0)
+
+model = biips_model(model_file, data, sample_data=FALSE)
+
+n_burn = 2000
+n_iter = 10000
+thin = 1
+n_part = 50
+
+
+obj_pimh = biips_pimh_init(model, variables)
+
+
+biips_pimh_update(obj_pimh, n_burn, n_part) # Burn-in iterations
+
+out_pimh = biips_pimh_samples(obj_pimh, n_iter, n_part, thin=thin) # Return samples
+summ_pimh = biips_summary(out_pimh, probs=c(.025, .975))
+```
+
 
 
 ##Mechanistic Integration
